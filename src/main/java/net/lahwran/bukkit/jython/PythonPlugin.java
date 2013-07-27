@@ -52,16 +52,7 @@ private boolean isEnabled = false;
     private File configFile = null;
     private PluginLogger logger = null;
     private PluginDataFile dataFile = null; //data file used for retrieving resources
-    
-    /**
-     * Listener to handle all PythonHooks events for this plugin.
-     */
-    PythonListener listener = new PythonListener();
 
-    /**
-     * PythonHooks registered on startup.
-     */
-    PythonHooks hooks;
 
     /**
      * interpreter that was used to load this plugin.
@@ -157,13 +148,8 @@ private boolean isEnabled = false;
             isEnabled = enabled;
 
             if (isEnabled) {
-                if (hooks.onEnable != null)
-                    hooks.onEnable.__call__();
-                hooks.doRegistrations(this);
                 onEnable();
             } else {
-                if (hooks.onDisable != null)
-                    hooks.onDisable.__call__();
                 onDisable();
             }
         }
@@ -179,7 +165,6 @@ private boolean isEnabled = false;
      * @param description PluginDescriptionFile containing metadata on this plugin
      * @param dataFolder Folder containing the plugin's data
      * @param file File containing this plugin
-     * @param classLoader ClassLoader which holds this plugin
      */
     protected final void initialize(PluginLoader loader, Server server,
             PluginDescriptionFile description, File dataFolder, File file ) { //,

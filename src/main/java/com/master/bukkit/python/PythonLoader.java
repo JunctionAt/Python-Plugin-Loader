@@ -38,7 +38,7 @@ public class PythonLoader extends JavaPlugin {
     @Override
     public void onLoad() {
         //check if jython.jar exists if not try to download
-        if(!new File("lib/jython.jar").exists()) {
+        /* if(!new File("lib/jython.jar").exists()) {
             getServer().getLogger().log(Level.SEVERE, "Could not find lib/jython.jar! I will try to automatically download it for you.");
             try {
                 URL website = new URL("http://dev.bukkit.org/media/files/647/602/jython.jar");
@@ -84,7 +84,7 @@ public class PythonLoader extends JavaPlugin {
                 getServer().getLogger().log(Level.SEVERE, "Error while donwloading jython.jar, loading of python plugins will fail! Please download jython from https://github.com/downloads/masteroftime/Python-Plugin-Loader/jython.jar and place it in the lib folder");
                 e.printStackTrace();
             }
-        }
+        } */
 
         //System.out.println("PythonLoader: initializing");
         // This must occur as early as possible, and only once.

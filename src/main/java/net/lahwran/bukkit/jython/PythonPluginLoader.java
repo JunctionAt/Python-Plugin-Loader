@@ -7,11 +7,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -19,20 +17,14 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.Validate;
 import org.bukkit.Server;
+import org.bukkit.Warning;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventException;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
-import org.bukkit.plugin.EventExecutor;
-import org.bukkit.plugin.InvalidDescriptionException;
-import org.bukkit.plugin.InvalidPluginException;
-import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.PluginLoader;
-import org.bukkit.plugin.RegisteredListener;
-import org.bukkit.plugin.TimedRegisteredListener;
-import org.bukkit.plugin.UnknownDependencyException;
+import org.bukkit.plugin.*;
 import org.bukkit.plugin.java.JavaPluginLoader;
 import org.python.core.Py;
 import org.python.core.PyList;
@@ -217,22 +209,20 @@ public class PythonPluginLoader implements PluginLoader {
             throw new InvalidPluginException(new FileNotFoundException("Data file does not contain "+mainfile));
         }
         try {
-            PythonHooks hook = new PythonHooks(description);
 
             PythonInterpreter interp = new PythonInterpreter();
 
-            interp.set("hook", hook);
             interp.set("info", description);
             
             // Decorator Enhancements
             interp.exec("import __builtin__");
-            interp.exec("__builtin__.hook = hook");
+            //interp.exec("__builtin__.hook = hook");
             interp.exec("__builtin__.info = info");
             
             // Hardcoded for now, may be worth thinking about generalizing it as sort of "addons" for the PythonPluginLoader
             // Could be used to extend the capabilities of python plugins the same way the metaclass decorators do, without requiring any changes to the PythonPluginLoader itself
-            String[] pre_plugin_scripts = {"imports.py", "meta_decorators.py"};
-            String[] post_plugin_scripts = {"meta_loader.py"};
+            String[] pre_plugin_scripts = {};//{"imports.py", "meta_decorators.py"};
+            String[] post_plugin_scripts = {};//{"meta_loader.py"};
             
             // Run scripts designed to be run before plugin creation
             for (String script : pre_plugin_scripts) {
@@ -275,8 +265,7 @@ public class PythonPluginLoader implements PluginLoader {
                 result = (PythonPlugin) pyClass.__call__().__tojava__(PythonPlugin.class);
             
             interp.set("pyplugin", result);
-            
-            result.hooks = hook;
+
             result.interp = interp;
             
             // Run scripts designed to be run after plugin creation
@@ -393,9 +382,6 @@ public class PythonPluginLoader implements PluginLoader {
                         ex);
             }
 
-            //finally register the listener for the hook events
-            server.getPluginManager().registerEvents(pyPlugin.listener, pyPlugin);
-
             // Perhaps abort here, rather than continue going, but as it stands,
             // an abort is not possible the way it's currently written
             server.getPluginManager().callEvent(new PluginEnableEvent(plugin));
@@ -403,39 +389,85 @@ public class PythonPluginLoader implements PluginLoader {
     }
 
     @Override
-    public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(
-            Listener listener, Plugin plugin) {
+    public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(Listener listener, final Plugin plugin) {
+        Validate.notNull(plugin, "Plugin can not be null");
+        Validate.notNull(listener, "Listener can not be null");
+
         boolean useTimings = server.getPluginManager().useTimings();
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
-
-        if(!listener.getClass().equals(PythonListener.class)) {
-            throw new IllegalArgumentException("Listener to register is not a PythonListener");
+        Set<Method> methods;
+        try {
+            Method[] publicMethods = listener.getClass().getMethods();
+            methods = new HashSet<Method>(publicMethods.length, Float.MAX_VALUE);
+            for (Method method : publicMethods) {
+                methods.add(method);
+            }
+            for (Method method : listener.getClass().getDeclaredMethods()) {
+                methods.add(method);
+            }
+        } catch (NoClassDefFoundError e) {
+            plugin.getLogger().severe("Plugin " + plugin.getDescription().getFullName() + " has failed to register events for " + listener.getClass() + " because " + e.getMessage() + " does not exist.");
+            return ret;
         }
 
-        PythonListener pyListener = (PythonListener)listener;
+        for (final Method method : methods) {
+            final EventHandler eh = method.getAnnotation(EventHandler.class);
+            if (eh == null) continue;
+            final Class<?> checkClass;
+            if (method.getParameterTypes().length != 1 || !Event.class.isAssignableFrom(checkClass = method.getParameterTypes()[0])) {
+                plugin.getLogger().severe(plugin.getDescription().getFullName() + " attempted to register an invalid EventHandler method signature \"" + method.toGenericString() + "\" in " + listener.getClass());
+                continue;
+            }
+            final Class<? extends Event> eventClass = checkClass.asSubclass(Event.class);
+            method.setAccessible(true);
+            Set<RegisteredListener> eventSet = ret.get(eventClass);
+            if (eventSet == null) {
+                eventSet = new HashSet<RegisteredListener>();
+                ret.put(eventClass, eventSet);
+            }
 
-        for(Map.Entry<Class<? extends Event>, Set<PythonEventHandler>> entry : pyListener.handlers.entrySet()) {
-            Set<RegisteredListener> eventSet = new HashSet<RegisteredListener>();
-
-            for(final PythonEventHandler handler : entry.getValue()) {
-                EventExecutor executor = new EventExecutor() {
-
-                    @Override
-                    public void execute(Listener listener, Event event) throws EventException {
-                        if(!listener.getClass().equals(PythonListener.class)) {
-                            throw new IllegalArgumentException("No PythonListener passed to EventExecutor! If this happens someone really fucked up something");
-                        }
-                        ((PythonListener)listener).fireEvent(event, handler);
+            for (Class<?> clazz = eventClass; Event.class.isAssignableFrom(clazz); clazz = clazz.getSuperclass()) {
+                // This loop checks for extending deprecated events
+                if (clazz.getAnnotation(Deprecated.class) != null) {
+                    Warning warning = clazz.getAnnotation(Warning.class);
+                    Warning.WarningState warningState = server.getWarningState();
+                    if (!warningState.printFor(warning)) {
+                        break;
                     }
-                };
-                if(useTimings) {
-                    eventSet.add(new TimedRegisteredListener(pyListener, executor, handler.priority, plugin, false));
-                }
-                else {
-                    eventSet.add(new RegisteredListener(pyListener, executor, handler.priority, plugin, false));
+                    plugin.getLogger().log(
+                            Level.WARNING,
+                            String.format(
+                                    "\"%s\" has registered a listener for %s on method \"%s\", but the event is Deprecated." +
+                                            " \"%s\"; please notify the authors %s.",
+                                    plugin.getDescription().getFullName(),
+                                    clazz.getName(),
+                                    method.toGenericString(),
+                                    (warning != null && warning.reason().length() != 0) ? warning.reason() : "Server performance will be affected",
+                                    Arrays.toString(plugin.getDescription().getAuthors().toArray())),
+                            warningState == Warning.WarningState.ON ? new AuthorNagException(null) : null);
+                    break;
                 }
             }
-            ret.put(entry.getKey(), eventSet);
+
+            EventExecutor executor = new EventExecutor() {
+                public void execute(Listener listener, Event event) throws EventException {
+                    try {
+                        if (!eventClass.isAssignableFrom(event.getClass())) {
+                            return;
+                        }
+                        method.invoke(listener, event);
+                    } catch (InvocationTargetException ex) {
+                        throw new EventException(ex.getCause());
+                    } catch (Throwable t) {
+                        throw new EventException(t);
+                    }
+                }
+            };
+            if (useTimings) {
+                eventSet.add(new TimedRegisteredListener(listener, executor, eh.priority(), plugin, eh.ignoreCancelled()));
+            } else {
+                eventSet.add(new RegisteredListener(listener, executor, eh.priority(), plugin, eh.ignoreCancelled()));
+            }
         }
         return ret;
     }
