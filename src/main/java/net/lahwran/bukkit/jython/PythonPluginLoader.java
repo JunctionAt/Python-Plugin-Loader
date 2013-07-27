@@ -11,7 +11,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,7 +24,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.*;
-import org.bukkit.plugin.java.JavaPluginLoader;
 import org.python.core.Py;
 import org.python.core.PyList;
 import org.python.core.PyObject;
@@ -117,25 +115,16 @@ public class PythonPluginLoader implements PluginLoader {
         System.out.println("[PythonLoader] Loading Plugin " + file.getName());
         PythonPlugin result = null;
         PluginDescriptionFile description = null;
-        boolean hasyml = true;
         boolean hassolidmeta = false; // whether we have coder-set metadata. true for have set metadata, false for inferred metadata.
         try {
             InputStream stream = data.getStream("plugin.yml");
             if (stream == null)
-                hasyml = false;
+                throw new InvalidPluginException("no plugin.yml file found");
 
-            if (hasyml) {
-                description = new PluginDescriptionFile(stream);
-                hassolidmeta = true;
-            } else {
-                String stripped = stripExtension(file.getName());
-                if (stripped == null)
-                    //throw new BukkitScrewedUpException("This would only occur if bukkit called the loader on a plugin which does not match the loader's regex.");
-                    throw new InvalidPluginException(new Exception("This shouldn't be happening; go tell whoever altered the plugin loading api in bukkit that they're whores."));
-                description = new PluginDescriptionFile(stripped, "dev", "plugin.py");
-            }
-            if (stream != null)
-                stream.close();
+            description = new PluginDescriptionFile(stream);
+            hassolidmeta = true;
+
+            stream.close();
         } catch (IOException ex) {
             throw new InvalidPluginException(ex);
         } catch (YAMLException ex) {
@@ -234,26 +223,6 @@ public class PythonPluginLoader implements PluginLoader {
             interp.execfile(instream);
 
             instream.close();
-
-            try {
-                if (!hasyml) {
-                    Object name = interp.get("__plugin_name__");
-                    Object version = interp.get("__plugin_version__");
-                    Object website = interp.get("__plugin_website__");
-                    Object main = interp.get("__plugin_mainclass__");
-                    hassolidmeta = name != null && version != null;
-                    if (name != null)
-                        ReflectionHelper.setPrivateValue(description, "name", name.toString());
-                    if (version != null)
-                        ReflectionHelper.setPrivateValue(description, "version", version.toString());
-                    if (website != null)
-                        ReflectionHelper.setPrivateValue(description, "website", website.toString());
-                    if (main != null)
-                        ReflectionHelper.setPrivateValue(description, "main", main.toString());
-                }
-            } catch (Throwable t) {
-                Logger.getLogger("Minecraft").log(Level.SEVERE, "Error while setting python-set description values", t);
-            }
 
             String mainclass = description.getMain();
             PyObject pyClass = interp.get(mainclass);
