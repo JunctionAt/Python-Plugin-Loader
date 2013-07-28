@@ -1,6 +1,11 @@
 Python Plugin Loader
 ====================
 
+Warning: This fork is not compatible at ALL with the original. It includes a 
+completely redone event system, doesn't include the decorator API and more.
+This readme may also not contain 100% accurate information, however it should
+contain some clues, and an example.
+
 The python plugin loader is a pluginloader for bukkit to load python plugins
 via jython (and hopefully via jpype eventually). 
 
