@@ -170,37 +170,20 @@ plugin.yml
 plugin.py
 *********
 
-    from org.bukkit.event.player import PlayerListener
-    from org.bukkit.event.Event import Type, Priority
-    
-    class SampleClass(PythonPlugin):
-        def __init__(self):
-            self.listener = SampleListener(self)
-            print "sample plugin main class instantiated"
-    
-        def onEnable(self):
-            pm = self.getServer().getPluginManager()
-            pm.registerEvent(Type.PLAYER_PICKUP_ITEM, listener, Priority.Normal, self)
-            pm.registerEvent(Type.PLAYER_RESPAWN, listener, Priority.Normal, self)
-            
-            print "sample plugin enabled"
-        
-        def onDisable(self):
-            print "sample plugin disabled"
-        
-        def onCommand(self, sender, command, label, args):
-            msg = "sample plugin command"
-            print msg
-            sender.sendMessage(msg)
-            return True
-    
-    class SampleListener(PlayerListener):
-        def __init__(self, plugin):
-            self.plugin = plugin
-        
-        def onPlayerJoin(self, event):
-            msg = "welcome from the sample plugin, %s" % event.getPlayer().getName()
-            print msg
-            event.getPlayer().sendMessage(msg)
-    
-    print "sample plugin main file run"
+   class TestPlugin(PythonPlugin):
+
+      def onEnable(self):
+		   self.getServer().getPluginManager().registerEvents(TestListener(self), self);
+		   print "TestPlugin Enabled"
+
+      def onDisable(self):
+		   print "TestPlugin Disabled"
+         
+   class AliasListener(PythonListener):
+
+      def __init__(self, plugin):
+		   self.plugin = plugin
+		   self.register_event(self.onServerCommand, ServerCommandEvent, priority="highest")
+
+	   def onServerCommand(self, event):
+		   print event.getCommand()
