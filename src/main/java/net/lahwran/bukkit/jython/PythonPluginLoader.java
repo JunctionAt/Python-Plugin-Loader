@@ -17,17 +17,11 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.Validate;
 import org.bukkit.Server;
 import org.bukkit.Warning;
-import org.bukkit.event.Event;
-import org.bukkit.event.EventException;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
+import org.bukkit.event.*;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.*;
-import org.python.core.Py;
-import org.python.core.PyList;
-import org.python.core.PyObject;
-import org.python.core.PyString;
+import org.python.core.*;
 import org.python.util.PythonInterpreter;
 import org.yaml.snakeyaml.error.YAMLException;
 
@@ -210,7 +204,7 @@ public class PythonPluginLoader implements PluginLoader {
             
             // Hardcoded for now, may be worth thinking about generalizing it as sort of "addons" for the PythonPluginLoader
             // Could be used to extend the capabilities of python plugins the same way the metaclass decorators do, without requiring any changes to the PythonPluginLoader itself
-            String[] pre_plugin_scripts = {};//{"imports.py", "meta_decorators.py"};
+            String[] pre_plugin_scripts = {"listener.py", "loader.py"};//{"imports.py", "meta_decorators.py"};
             String[] post_plugin_scripts = {};//{"meta_loader.py"};
             
             // Run scripts designed to be run before plugin creation
@@ -359,86 +353,55 @@ public class PythonPluginLoader implements PluginLoader {
 
     @Override
     public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(Listener listener, final Plugin plugin) {
+
         Validate.notNull(plugin, "Plugin can not be null");
         Validate.notNull(listener, "Listener can not be null");
 
         boolean useTimings = server.getPluginManager().useTimings();
+
+        PyList handlers = (PyList) ((PyProxy) listener)._getPyInstance().__getattr__("_event_handlers");
+
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
-        Set<Method> methods;
-        try {
-            Method[] publicMethods = listener.getClass().getMethods();
-            methods = new HashSet<Method>(publicMethods.length, Float.MAX_VALUE);
-            for (Method method : publicMethods) {
-                methods.add(method);
-            }
-            for (Method method : listener.getClass().getDeclaredMethods()) {
-                methods.add(method);
-            }
-        } catch (NoClassDefFoundError e) {
-            plugin.getLogger().severe("Plugin " + plugin.getDescription().getFullName() + " has failed to register events for " + listener.getClass() + " because " + e.getMessage() + " does not exist.");
-            return ret;
-        }
 
-        for (final Method method : methods) {
-            final EventHandler eh = method.getAnnotation(EventHandler.class);
-            if (eh == null) continue;
-            final Class<?> checkClass;
-            if (method.getParameterTypes().length != 1 || !Event.class.isAssignableFrom(checkClass = method.getParameterTypes()[0])) {
-                plugin.getLogger().severe(plugin.getDescription().getFullName() + " attempted to register an invalid EventHandler method signature \"" + method.toGenericString() + "\" in " + listener.getClass());
-                continue;
-            }
-            final Class<? extends Event> eventClass = checkClass.asSubclass(Event.class);
-            method.setAccessible(true);
-            Set<RegisteredListener> eventSet = ret.get(eventClass);
-            if (eventSet == null) {
-                eventSet = new HashSet<RegisteredListener>();
-                ret.put(eventClass, eventSet);
-            }
+        for(Object handler_o : handlers) {
+            System.out.println(handler_o);
 
-            for (Class<?> clazz = eventClass; Event.class.isAssignableFrom(clazz); clazz = clazz.getSuperclass()) {
-                // This loop checks for extending deprecated events
-                if (clazz.getAnnotation(Deprecated.class) != null) {
-                    Warning warning = clazz.getAnnotation(Warning.class);
-                    Warning.WarningState warningState = server.getWarningState();
-                    if (!warningState.printFor(warning)) {
-                        break;
-                    }
-                    plugin.getLogger().log(
-                            Level.WARNING,
-                            String.format(
-                                    "\"%s\" has registered a listener for %s on method \"%s\", but the event is Deprecated." +
-                                            " \"%s\"; please notify the authors %s.",
-                                    plugin.getDescription().getFullName(),
-                                    clazz.getName(),
-                                    method.toGenericString(),
-                                    (warning != null && warning.reason().length() != 0) ? warning.reason() : "Server performance will be affected",
-                                    Arrays.toString(plugin.getDescription().getAuthors().toArray())),
-                            warningState == Warning.WarningState.ON ? new AuthorNagException(null) : null);
-                    break;
-                }
-            }
+            final PyDictionary handler = (PyDictionary) handler_o;
+
+            EventPriority priority = EventPriority.valueOf(((String)handler.get("priority")).toUpperCase());
+            final PyMethod method = (PyMethod) handler.get("method");
+
+            //if(!handler.get("event").getClass().isAssignableFrom(Event.class)) {
+            //    throw new IllegalArgumentException();
+            //}
+
+            Class<? extends Event> event_class = (Class<? extends Event>) handler.get("event");
 
             EventExecutor executor = new EventExecutor() {
+                @Override
                 public void execute(Listener listener, Event event) throws EventException {
-                    try {
-                        if (!eventClass.isAssignableFrom(event.getClass())) {
-                            return;
-                        }
-                        method.invoke(listener, event);
-                    } catch (InvocationTargetException ex) {
-                        throw new EventException(ex.getCause());
-                    } catch (Throwable t) {
-                        throw new EventException(t);
-                    }
+                    method.__call__(Py.java2py(event));
                 }
             };
-            if (useTimings) {
-                eventSet.add(new TimedRegisteredListener(listener, executor, eh.priority(), plugin, eh.ignoreCancelled()));
-            } else {
-                eventSet.add(new RegisteredListener(listener, executor, eh.priority(), plugin, eh.ignoreCancelled()));
+
+            Set<RegisteredListener> set = ret.get(event_class);
+
+            if(set == null) {
+                set = new HashSet<RegisteredListener>();
+                ret.put(event_class, set);
             }
+
+            if(useTimings) {
+                set.add(new TimedRegisteredListener(listener, executor, priority, plugin, false));
+            }
+            else {
+                set.add(new RegisteredListener(listener, executor, priority, plugin, false));
+            }
+
         }
+
         return ret;
+
     }
 
     @Override
