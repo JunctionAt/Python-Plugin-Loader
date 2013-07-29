@@ -364,7 +364,7 @@ public class PythonPluginLoader implements PluginLoader {
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
 
         for(Object handler_o : handlers) {
-            System.out.println(handler_o);
+            //System.out.println(handler_o);
 
             final PyDictionary handler = (PyDictionary) handler_o;
 
