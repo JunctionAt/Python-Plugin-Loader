@@ -179,7 +179,7 @@ plugin.py
       def onDisable(self):
 		   print "TestPlugin Disabled"
          
-   class AliasListener(PythonListener):
+   class TestListener(PythonListener):
 
       def __init__(self, plugin):
 		   self.plugin = plugin
