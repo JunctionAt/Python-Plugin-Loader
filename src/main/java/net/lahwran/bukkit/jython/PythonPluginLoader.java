@@ -359,9 +359,10 @@ public class PythonPluginLoader implements PluginLoader {
 
         boolean useTimings = server.getPluginManager().useTimings();
 
-        PyList handlers = (PyList) ((PyProxy) listener)._getPyInstance().__getattr__("_event_handlers");
-
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
+
+        PyList handlers;
+        handlers = (PyList) ((PyProxy) listener)._getPyInstance().__getattr__("_event_handlers");
 
         for(Object handler_o : handlers) {
             //System.out.println(handler_o);
