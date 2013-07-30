@@ -155,6 +155,7 @@ Summary of fields:
 
 Sample plugin using class api
 -----------------------------
+For a complete plugin using the python loader, see https://github.com/JunctionAt/Omneity
 
 plugin.yml
 **********
