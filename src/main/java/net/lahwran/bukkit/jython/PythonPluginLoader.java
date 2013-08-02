@@ -22,6 +22,7 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.*;
 import org.python.core.*;
+import org.python.core.__builtin__;
 import org.python.util.PythonInterpreter;
 import org.yaml.snakeyaml.error.YAMLException;
 
@@ -360,6 +361,10 @@ public class PythonPluginLoader implements PluginLoader {
         boolean useTimings = server.getPluginManager().useTimings();
 
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
+
+        if(!__builtin__.hasattr(handler_pyobj, new PyString("_event_handlers"))) {
+            return ret;
+        }
 
         PyList handlers;
         handlers = (PyList) ((PyProxy) listener)._getPyInstance().__getattr__("_event_handlers");
