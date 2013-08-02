@@ -25,6 +25,8 @@ import org.python.core.*;
 import org.python.util.PythonInterpreter;
 import org.yaml.snakeyaml.error.YAMLException;
 
+import org.python.core.__builtin__;
+
 import com.master.bukkit.python.ReflectionHelper;
 
 /**
@@ -361,7 +363,13 @@ public class PythonPluginLoader implements PluginLoader {
 
         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<Class<? extends Event>, Set<RegisteredListener>>();
 
+        PyObject handler_pyobj = ((PyProxy) listener)._getPyInstance();
+
         PyList handlers;
+
+        if(!__builtin__.hasattr(handler_pyobj, new PyString("_event_handlers"))){
+            return ret;
+        }
         handlers = (PyList) ((PyProxy) listener)._getPyInstance().__getattr__("_event_handlers");
 
         for(Object handler_o : handlers) {
