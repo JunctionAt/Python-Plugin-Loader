@@ -9,6 +9,8 @@ contain some clues, and an example.
 The python plugin loader is a pluginloader for bukkit to load python plugins
 via jython (and hopefully via jpype eventually). 
 
+The other part of this project is a convenience liberary that makes interfacing with bukkit easier. This is located at https://github.com/hansihe/Python-Plugin-Loader-Lib
+
 
 Using the plugin loader
 -----------------------
@@ -41,15 +43,15 @@ Using plugins
 Writing plugins
 ===============
 
-Writing plugins with PythonLoader is fairly easy. There are two apis, both
-of which are pretty simple; The first is the bukkit api, which this loader
-lightly wraps; and the other is a decorators-and-functions api.
+Writing plugins with PythonLoader is fairly easy.
 
 Basics
 ------
 
 Your plugins go in either a zip or a directory (known to windows users as "folders");
 that zip or directory name must match this regex: \.py\.?(dir|zip|p|pl|plug|plugin)$
+
+Use convinience liberary at https://github.com/hansihe/Python-Plugin-Loader-Lib
 
 
 Class (bukkit standard) API
