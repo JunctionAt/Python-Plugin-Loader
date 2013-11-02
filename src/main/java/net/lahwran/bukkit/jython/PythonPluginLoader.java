@@ -172,6 +172,7 @@ public class PythonPluginLoader implements PluginLoader {
             pythonpath.append(filepath);
         }
 
+        PyString libPath = new PyString(new File(file, "Lib").getAbsolutePath());
 
         String mainfile = description.getMain();
         InputStream instream = null;
