@@ -12,6 +12,9 @@ via jython (and hopefully via jpype eventually).
 The other part of this project is a convenience liberary that makes interfacing with bukkit easier. This is located at https://github.com/hansihe/Python-Plugin-Loader-Lib
 
 
+[![Build Status](https://travis-ci.org/hansihe/Python-Plugin-Loader.svg?branch=master)](https://travis-ci.org/hansihe/Python-Plugin-Loader)
+
+
 Using the plugin loader
 -----------------------
 
