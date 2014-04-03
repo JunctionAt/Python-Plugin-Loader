@@ -145,10 +145,10 @@ public class PythonPluginLoader implements PluginLoader {
                     file)));
         }
 
-        ArrayList<String> depend;
+        List<String> depend;
 
         try {
-            depend = (ArrayList<String>) description.getDepend();
+            depend = (List<String>) description.getDepend();
             if (depend == null) {
                 depend = new ArrayList<String>();
             }
